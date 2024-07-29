@@ -136,7 +136,7 @@ class PyBulletSim:
                                           0.5, 0.1, 0.2], p.getQuaternionFromEuler([np.pi, 0, 0]))
 
         p.createConstraint(self.robot_body_id, self.robot_end_effector_link_index, self._gripper_body_id, -1, jointType=p.JOINT_FIXED, jointAxis=[
-                           0, 0, 0], parentFramePosition=[0, 0, 0], childFramePosition=self._robot_tool_offset, childFrameOrientation=p.getQuaternionFromEuler([0, 0, np.pi/2]))
+                           0, 0, 0], parentFramePosition=[0, 0, 0], childFramePosition=self._robot_tool_offset, childFrameOrientation=p.getQuaternionFromEuler([0, 0, 0]))
 
         # Set friction coefficients for gripper fingers
         for i in range(p.getNumJoints(self._gripper_body_id)):

@@ -6,7 +6,7 @@ import random
 import numpy as np
 import math
 
-MAX_ITERS = 1000 # so lan lap toi da cho thuat toan rrt
+MAX_ITERS = 10000# so lan lap toi da cho thuat toan rrt
 delta_q = 0.1 # kich thuoc buoc cho thuat toan
 
 def visualize_path(q_1, q_2, env, color=[0, 1, 0]): # hien thi duong di giua 2 cau hinh khop q_1,q_2

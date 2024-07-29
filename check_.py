@@ -53,4 +53,3 @@ for q in test_joint_positions:
         print(f"No collision for joint positions: {q}")
 
 # Ngắt kết nối PyBullet
-collision_tester.disconnect()
