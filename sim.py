@@ -37,7 +37,7 @@ class PyBulletSim:
 
         # Placeholder for gripper body id
         self._gripper_body_id = None
-        self.robot_end_effector_link_index = 9
+        self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
         # Distance between tool tip and end-effector joint
         self._tool_tip_to_ee_joint = np.array([0, 0, 0.15])
@@ -56,7 +56,7 @@ class PyBulletSim:
                                         0, np.pi / 2, 0, np.pi / 2, 0]
 
         # Robot goal joint configuration (over tote 2)
-        self.robot_goal_joint_config = [np.pi/2,
+        self.robot_goal_joint_config = [np.pi,
                                         0, np.pi / 2, 0, np.pi / 2, 0]
 
         self.move_joints(self.robot_home_joint_config, speed=1.0)
@@ -105,7 +105,7 @@ class PyBulletSim:
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, 0.65, 0.3],
+                       basePosition=[0, 0.65, 0.4],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
@@ -289,7 +289,7 @@ class PyBulletSim:
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
 
-    def check_collision(self, q, distance=0.18):
+    def check_collision(self, q, distance=0.15):
         self.set_joint_positions(q)
         for obstacle_id in self.obstacles:
             closest_points = p.getClosestPoints(

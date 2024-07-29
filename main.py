@@ -13,16 +13,16 @@ def visualize_path(q_1, q_2, env, color=[0, 1, 0]): # hien thi duong di giua 2 c
     # obtain position of first point
     # dat duoc vi tri dem dau tien
     env.set_joint_positions(q_1)
-    point_1 = p.getLinkState(env.robot_body_id, 9)[0]
+    point_1 = p.getLinkState(env.robot_body_id, 6)[0]
     # obtain position of second point
     # dat duoc vi tri diem thu 2
     env.set_joint_positions(q_2)
-    point_2 = p.getLinkState(env.robot_body_id, 9)[0]
+    point_2 = p.getLinkState(env.robot_body_id, 6)[0]
     # draw line between points
     p.addUserDebugLine(point_1, point_2, color, 1.0)
 
 
-def rrt(q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, env, distance=0.18):
+def rrt(q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, env, distance=0.15):
     """
     Hàm này triển khai thuật toán RRT để lập kế hoạch đường đi từ cấu hình ban đầu q_init đến cấu hình đích q_goal
     :param q_init: initial configuration
@@ -44,6 +44,7 @@ def rrt(q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, env, distance=0.18):
         q_nearest = nearest(V, q_rand)
         q_new = steer(q_nearest, q_rand, delta_q)
         if not env.check_collision(q_new, distance):
+            print("123")
             if q_new not in V:
                 V.append(q_new)
             if (q_nearest, q_new) not in E:
@@ -74,11 +75,15 @@ def semi_random_sample(steer_goal_p, q_goal):
     """
     :param steer_goal_p: probability of steering towards the goal
     :param q_goal: goal configuration
-
     :returns q_rand: a uniform random sample in free Cspace
+    Hàm này lấy mẫu ngẫu nhiên trong không gian cấu hình tự do (free Cspace):
+    steer_goal_p: Xác suất hướng tới mục tiêu
+    q_goal: Cấu hình đích.
+    Nếu xác suất ngẫu nhiên nhỏ hơn steer_goal_p, hàm sẽ trả về q_goal.
+    Nếu không, hàm sẽ lấy mẫu ngẫu nhiên trong khoảng từ -π đến π cho mỗi khớp (joint) của robot.
     """
     prob = random.random()
-
+    # print("prob:",prob)
     if prob < steer_goal_p:
         return q_goal
     else:
@@ -88,6 +93,12 @@ def semi_random_sample(steer_goal_p, q_goal):
 
 
 def get_euclidean_distance(q1, q2):
+    """
+    Hàm này tính khoảng cách Euclidean giữa hai cấu hình q1 và q2:
+    q1, q2: Hai cấu hình (danh sách các giá trị góc khớp).
+    Tính tổng bình phương sự khác biệt của
+    từng thành phần và lấy căn bậc hai của tổng này để có khoảng cách Euclidean.
+    """
     distance = 0
     for i in range(len(q1)):
         distance += (q2[i] - q1[i])**2
@@ -96,13 +107,17 @@ def get_euclidean_distance(q1, q2):
 
 def nearest(V, q_rand):
     """
+    Hàm này tìm điểm gần nhất trong cây hiện tại V tới cấu hình ngẫu nhiên q_rand:
+     V: Các đỉnh trong cây hiện tại (danh sách các cấu hình).
+    q_rand: Cấu hình ngẫu nhiên.
+    Hàm sẽ duyệt qua tất cả các đỉnh trong V, tính khoảng cách Euclidean
+    từ q_rand tới từng đỉnh và trả về đỉnh có khoảng cách ngắn nhất.
     :param V: vertices in the current tree
     :param q_rand: a new uniform random sample
-
     :returns q_nearest: the closet point on the tree to q_rand
     """
     # Using euclidean distance
-    distance = float("inf")
+    distance = float("inf") # gan distance bang duong vo cung
     q_nearest = None
     for idx, v in enumerate(V):
         if get_euclidean_distance(q_rand, v) < distance:
@@ -118,6 +133,8 @@ def steer(q_nearest, q_rand, delta_q):
     else:
         q_hat = [(q_rand[i] - q_nearest[i]) / get_euclidean_distance(q_rand, q_nearest) for i in range(len(q_rand))]
         q_new = [q_nearest[i] + q_hat[i] * delta_q for i in range(len(q_hat))]
+        # print("q_hat",q_hat)
+        # print("q_new",q_new)
     return q_new
 
 
@@ -189,6 +206,7 @@ if __name__ == "__main__":
         grasp_success = env.execute_grasp(position, grasp_angle)
         if grasp_success:
             # get a list of robot configuration in small step sizes
+            # lay danh sach cau hinh robot o kich thuoc nho
             path_conf = rrt(env.robot_home_joint_config,
                             env.robot_goal_joint_config, MAX_ITERS, delta_q, 0.5, env)
             if path_conf is None:
