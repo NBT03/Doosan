@@ -1,0 +1,93 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import pybullet as p
+import random
+from sim import PyBulletSim
+
+# Neural Network Model
+class PathPlannerNN(nn.Module):
+    def __init__(self):
+        super(PathPlannerNN, self).__init__()
+        self.fc1 = nn.Linear(12, 128)
+        self.fc2 = nn.Linear(128, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, 6)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = torch.relu(self.fc3(x))
+        x = self.fc4(x)
+        return x
+
+# Generate random positions and orientations for obstacles
+def generate_random_obstacles(num_obstacles, workspace_bounds):
+    obstacles = []
+    for _ in range(num_obstacles):
+        position = workspace_bounds[:, 0] + 0.15 + \
+            np.random.random_sample((3)) * (workspace_bounds[:, 1] - workspace_bounds[:, 0] - 0.15)
+        orientation = np.random.random_sample((3)) * np.pi / 4 - np.pi / 8
+        orientation[1] += np.pi
+        orientation = p.getQuaternionFromEuler(orientation)
+        obstacles.append((position, orientation))
+    return obstacles
+
+# Training function
+def train_model(model, criterion, optimizer, data_loader, epochs=100):
+    model.train()
+    for epoch in range(epochs):
+        running_loss = 0.0
+        for inputs, targets in data_loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        print(f"Epoch {epoch+1}, Loss: {running_loss/len(data_loader)}")
+
+# Generate training data
+def generate_training_data(env, num_samples):
+    training_data = []
+    for _ in range(num_samples):
+        env.reset_objects()
+        obstacles = generate_random_obstacles(5, env._workspace1_bounds)
+        for position, orientation in obstacles:
+            p.loadURDF("assets/objects/cube.urdf", position, orientation)
+
+        q_init = np.random.uniform(-np.pi, np.pi, 6)
+        q_goal = np.random.uniform(-np.pi, np.pi, 6)
+        env.set_joint_positions(q_init)
+        init_pos = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)[0]
+        env.set_joint_positions(q_goal)
+        goal_pos = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)[0]
+
+        inputs = np.concatenate((init_pos, goal_pos)).astype(np.float32)
+        targets = q_goal.astype(np.float32)
+
+        training_data.append((inputs, targets))
+        p.removeAllUserDebugItems()
+
+    return training_data
+
+if __name__ == "__main__":
+    random.seed(1)
+    env = PyBulletSim(object_shapes=["assets/objects/cube.urdf"])
+    num_samples = 1000
+
+    training_data = generate_training_data(env, num_samples)
+    inputs, targets = zip(*training_data)
+    inputs = torch.tensor(inputs)
+    targets = torch.tensor(targets)
+
+    dataset = torch.utils.data.TensorDataset(inputs, targets)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
+
+    model = PathPlannerNN()
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    train_model(model, criterion, optimizer, data_loader)
+        torch.save(model.state_dict(), "path_planner_model.pth")

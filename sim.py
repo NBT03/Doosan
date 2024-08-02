@@ -40,7 +40,7 @@ class PyBulletSim:
         self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
         # Distance between tool tip and end-effector joint
-        self._tool_tip_to_ee_joint = np.array([0, 0, 0.15])
+        self._tool_tip_to_ee_joint = np.array([0, 0, 0.156])
 
         # Get revolute joint indices of robot (skip fixed joints)
         robot_joint_info = [p.getJointInfo(self.robot_body_id, i) for i in range(
@@ -119,7 +119,18 @@ class PyBulletSim:
             p.loadURDF('assets/obstacles/block.urdf',
                        basePosition=[0, 0, 1.5],
                        useFixedBase=True
-                       ),
+                       )
+            ,
+            p.loadURDF('assets/obstacles/block.urdf',
+                       basePosition=[0, 0.55, 1],
+                       useFixedBase=True
+                       )
+            ,
+            p.loadURDF('assets/obstacles/block.urdf',
+                       basePosition=[0.65, 0, 1],
+                       useFixedBase=True
+                       )
+            ,
         ]
         self.obstacles.extend(
             [self._plane_id, self._tote1_body_id, self._tote2_body_id])
@@ -278,7 +289,7 @@ class PyBulletSim:
     def reset_objects(self):
         for object_body_id in self._objects_body_ids:
             random_position = np.random.random_sample((3))*(self._workspace1_bounds[:, 1]-(
-                self._workspace1_bounds[:, 0]+0.1))+self._workspace1_bounds[:, 0]+0.1
+                    self._workspace1_bounds[:, 0]+0.1))+self._workspace1_bounds[:, 0]+0.1
             random_orientation = np.random.random_sample((3))*2*np.pi-np.pi
             p.resetBasePositionAndOrientation(
                 object_body_id, random_position, p.getQuaternionFromEuler(random_orientation))
@@ -289,7 +300,7 @@ class PyBulletSim:
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
 
-    def check_collision(self, q, distance=0.15):
+    def check_collision(self, q, distance=0.155):
         self.set_joint_positions(q)
         for obstacle_id in self.obstacles:
             closest_points = p.getClosestPoints(
