@@ -95,7 +95,7 @@ class PyBulletSim:
         for i in range(self._num_objects):
             object_body_id = p.loadURDF(self._object_shapes[i], [0.5, 0.1, 0.1], p.getQuaternionFromEuler([0, 0, 0]))
             self._objects_body_ids.append(object_body_id)
-            p.changeVisualShape(git f, -1, rgbaColor=[*self._object_colors[i], 1])
+            p.changeVisualShape(object_body_id, -1, rgbaColor=[*self._object_colors[i], 1])
         self.reset_objects()
 
         # Add obstacles
