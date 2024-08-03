@@ -14,7 +14,7 @@ class Node:
         self.joint_positions = joint_positions
         self.parent = parent
 
-def visualize_path(q_1, q_2, env, color=[0, 1, 0]):  # hiển thị đường đi giữa 2 cấu hình khớp q_1, q_2
+def visualize_path(q_1, q_2, env, color=[0, 0, 0]):  # hiển thị đường đi giữa 2 cấu hình khớp q_1, q_2
     env.set_joint_positions(q_1.joint_positions)
     point_1 = p.getLinkState(env.robot_body_id, 6)[0]
     env.set_joint_positions(q_2.joint_positions)
@@ -205,7 +205,5 @@ if __name__ == "__main__":
             object_pos[1] >= -0.3 and object_pos[1] <= 0.3 and \
             object_pos[2] <= 0.2:
                 passed += 1
-        env.reset_objects()
-
         env.reset_objects()
     print(f"[RRT* Execution] {passed} / {num_trials} cases passed")

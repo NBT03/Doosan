@@ -40,7 +40,7 @@ class PyBulletSim:
         self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
         # Distance between tool tip and end-effector joint
-        self._tool_tip_to_ee_joint = np.array([0, 0, 0.156])
+        self._tool_tip_to_ee_joint = np.array([0, 0, 0.15])
 
         # Get revolute joint indices of robot (skip fixed joints)
         robot_joint_info = [p.getJointInfo(self.robot_body_id, i) for i in range(
@@ -95,7 +95,7 @@ class PyBulletSim:
         for i in range(self._num_objects):
             object_body_id = p.loadURDF(self._object_shapes[i], [0.5, 0.1, 0.1], p.getQuaternionFromEuler([0, 0, 0]))
             self._objects_body_ids.append(object_body_id)
-            p.changeVisualShape(object_body_id, -1, rgbaColor=[*self._object_colors[i], 1])
+            p.changeVisualShape(git f, -1, rgbaColor=[*self._object_colors[i], 1])
         self.reset_objects()
 
         # Add obstacles
