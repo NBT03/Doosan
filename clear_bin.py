@@ -91,6 +91,7 @@ if __name__ == "__main__":
         dataset = RGBDataset("")
         rgb_img = dataset.transform(rgb_obs)
         rgb_img = rgb_img.reshape([1, 3, 480, 640])
+        rgb_img = rgb_img.to('cuda')
 
         output = model(rgb_img)
         _, pred = torch.max(output, dim=1)
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         # ====================================================================================
         position = transform @ (object_grasp_positions[obj_index].flatten())
         position = position[:3]
-        grasp_angle = object_grasp_angles[obj_index] + np.arctan(transform[1, 0]/transform[0, 0])
+        grasp_angle = object_grasp_angles[obj_index] + np.arctan(transform[1, 0]/transform[0, 0]) + np.pi/2
         # ====================================================================================
 
         # visualize grasp position using a big red sphere
@@ -185,8 +186,8 @@ if __name__ == "__main__":
             is_grasped[obj_index] = True
 
             # Get a list of robot configurations in small step sizes
-            path_conf = main.rrt(env.robot_home_joint_config,
-                            env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5, env, distance=0.2)
+            path_conf = main.rrt_star(env.robot_home_joint_config,
+                                 env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5, env)
             if path_conf is None:
                 print(
                     "no collision-free path is found within the time budget. continuing ...")
