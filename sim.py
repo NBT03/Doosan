@@ -2,11 +2,10 @@ import pybullet as p
 import pybullet_data
 import numpy as np
 import time
-
-
+import math
 class PyBulletSim:
     """
-    PyBulletSim: Implements two tote UR5 simulation environment with obstacles for grasping 
+    PyBulletSim: Implements two tote UR5 simulation environment with obstacles for grasping
         and manipulation
     """
     def __init__(self, use_random_objects=False, object_shapes=None, gui=True):
@@ -16,6 +15,15 @@ class PyBulletSim:
             [-0.22, 0.22],
             [0.00, 0.5]
         ])
+        self.velocities = [[0.01, 0.01, 0.01],
+                           [0.01, 0.03, -0.01],
+                           [0.01, -0.01, 0.01],
+                           [0.01, 0.01, 0],
+                           [0.01, 0.01, 0],
+                           [0.01, 0.01, 0],
+                           [0.01, 0.01, 0]
+                           ]
+        self.directions = [1, 1, 1, 1]
         # 3D workspace for tote 2
         self._workspace2_bounds = np.copy(self._workspace1_bounds)
         self._workspace2_bounds[0, :] = - self._workspace2_bounds[0, ::-1]
@@ -101,39 +109,25 @@ class PyBulletSim:
         # Add obstacles
         self.obstacles = [
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, 0.65, 0.9],
+                       basePosition=[-0.5, -0.55, 1],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, 0.65, 0.4],
+                       basePosition=[0, 0.5, 0.8],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, -0.65, 0.9],
+                       basePosition=[0.5, -0.55, 0.9],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, -0.65, 0.3],
+                       basePosition=[0.0, 0.0, 1.3],
                        useFixedBase=True
                        ),
-            p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, 0, 1.5],
-                       useFixedBase=True
-                       )
-            ,
-            p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0, 0.55, 1],
-                       useFixedBase=True
-                       )
-            ,
-            p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.65, 0, 1],
-                       useFixedBase=True
-                       )
-            ,
         ]
         self.obstacles.extend(
             [self._plane_id, self._tote1_body_id, self._tote2_body_id])
+
 
     def load_gripper(self):
         if self._gripper_body_id is not None:
@@ -155,7 +149,7 @@ class PyBulletSim:
                              rollingFriction=0.0001, frictionAnchor=True)
         self.step_simulation(1e3)
 
-    def move_joints(self, target_joint_state, speed=0.03):
+    def move_joints(self, target_joint_state, speed=0.01):
         """
             Move robot arm to specified joint configuration by appropriate motor control
         """
@@ -200,8 +194,8 @@ class PyBulletSim:
         # ========= Part 1 ========
         # Using inverse kinematics (p.calculateInverseKinematics), find out the target joint configuration of the robot
         # in order to reach the desired end_effector position and orientation
-        # HINT: p.calculateInverseKinematics takes in the end effector **link index** and not the **joint index**. You can use 
-        #   self.robot_end_effector_link_index for this 
+        # HINT: p.calculateInverseKinematics takes in the end effector **link index** and not the **joint index**. You can use
+        #   self.robot_end_effector_link_index for this
         # HINT: You might want to tune optional parameters of p.calculateInverseKinematics for better performance
         # ===============================
         target_joint_state = p.calculateInverseKinematics(self.robot_body_id,
@@ -230,7 +224,7 @@ class PyBulletSim:
         """
             Execute grasp sequence
             @param: grasp_position: 3d position of place where the gripper jaws will be closed
-            @param: grasp_angle: angle of gripper before executing grasp from positive x axis in radians 
+            @param: grasp_angle: angle of gripper before executing grasp from positive x axis in radians
         """
         # Adjust grasp_position to account for end-effector length
         grasp_position = grasp_position + self._tool_tip_to_ee_joint
@@ -278,7 +272,7 @@ class PyBulletSim:
                 p.setJointMotorControlArray(
                     self._gripper_body_id, [6, 3, 8, 5, 10], p.POSITION_CONTROL,
                     [
-                        gripper_joint_positions[1], -gripper_joint_positions[1], 
+                        gripper_joint_positions[1], -gripper_joint_positions[1],
                         -gripper_joint_positions[1], gripper_joint_positions[1],
                         gripper_joint_positions[1]
                     ],
@@ -305,8 +299,91 @@ class PyBulletSim:
         for obstacle_id in self.obstacles:
             closest_points = p.getClosestPoints(
                 self.robot_body_id, obstacle_id, distance)
+            # print(closest_points)
             if closest_points is not None and len(closest_points) != 0:
                 return True
+        return False
+
+    import time
+
+    def update_moving_obstacles(self):
+        last_reverse_time = time.time()
+        reverse_interval = 7  # Time in seconds to reverse direction
+
+        while True:
+            if len(self.obstacles) < 4:
+                print("Not enough obstacles to update.")
+                time.sleep(1)  # Delay before retrying
+                continue
+
+            try:
+                current_time = time.time()
+                if current_time - last_reverse_time >= reverse_interval:
+                    # Reverse the directions every 2 seconds
+                    self.directions[0] *= -1
+                    self.directions[1] *= -1
+                    self.directions[2] *= -1
+                    self.directions[3] *= -1
+
+                    last_reverse_time = current_time
+
+                # Get the current position of the obstacles
+                pos1, _ = p.getBasePositionAndOrientation(self.obstacles[0])
+                pos2, _ = p.getBasePositionAndOrientation(self.obstacles[1])
+                pos3, _ = p.getBasePositionAndOrientation(self.obstacles[2])
+                pos4, _ = p.getBasePositionAndOrientation(self.obstacles[3])
+
+
+                # Update the position of the obstacles with the movement direction
+                new_pos1 = [pos1[0] + self.velocities[0][0] * self.directions[0] * 0.1,
+                            pos1[1] + self.velocities[0][1] * self.directions[0] * 0.3,
+                            pos1[2] + self.velocities[0][2] * self.directions[0] * 0.3]
+                new_pos2 = [pos2[0] + self.velocities[1][0] * self.directions[1] * 0.1,
+                            pos2[1] + self.velocities[1][1] * self.directions[1] * 0.3,
+                            pos2[2] + self.velocities[1][2] * self.directions[1] * 0.3]
+                new_pos3 = [pos3[0] + self.velocities[2][0] * self.directions[2] * 0.1,
+                            pos3[1] + self.velocities[2][1] * self.directions[2] * 0.3,
+                            pos3[2] + self.velocities[2][2] * self.directions[2] * 0.3]
+                new_pos4 = [pos4[0] + self.velocities[3][0] * self.directions[3] * 0.1,
+                            pos4[1] + self.velocities[3][1] * self.directions[3] * 0.3,
+                            pos4[2] + self.velocities[3][2] * self.directions[3] * 0.3]
+
+                # Set the new position for the obstacles
+                p.resetBasePositionAndOrientation(self.obstacles[0], new_pos1, p.getQuaternionFromEuler([0, 0, 0]))
+                p.resetBasePositionAndOrientation(self.obstacles[1], new_pos2, p.getQuaternionFromEuler([0, 0, 0]))
+                p.resetBasePositionAndOrientation(self.obstacles[2], new_pos3, p.getQuaternionFromEuler([0, 0, 0]))
+                p.resetBasePositionAndOrientation(self.obstacles[3], new_pos4, p.getQuaternionFromEuler([0, 0, 0]))
+
+            except Exception as e:
+                print(f"Error updating obstacles: {e}")
+
+            # Delay to control update speed
+            time.sleep(0.1)
+
+    def predict_collision(self, q, velocities, time_horizon=1, delta_t=0.1):
+        future_positions = [[] for _ in range(int(time_horizon / delta_t))]
+
+        # Lưu vận tốc vào thuộc tính đối tượng
+        self.velocities = velocities
+
+        # Tính toán các vị trí tương lai cho vật cản
+        for i in range(int(time_horizon / delta_t)):
+            # print("obstacles", self.obstacles)
+            for j, obs_id in enumerate(self.obstacles):
+                pos, _ = p.getBasePositionAndOrientation(obs_id)
+                if len(self.velocities) > j and len(self.velocities[j]) == 3:
+                    future_pos = [pos[k] + self.velocities[j][k] * delta_t for k in range(3)]
+                    future_positions[i].append(future_pos)
+                else:
+                    print(f"Invalid velocity for obstacle ID {obs_id}")
+                    return False
+        # print(future_positions)
+        # Kiểm tra va chạm cho các vị trí tương lai
+        for future_pos_list in future_positions:
+            for future_pos in future_pos_list:
+                if self.check_collision(q):
+                    return True
+
         return False
 
 
@@ -331,7 +408,7 @@ class SphereMarker:
             self.debug_item_ids.append(
                 p.addUserDebugText(text, position + radius)
             )
-        
+
         if orientation is not None:
             # x axis
             axis_size = 2 * radius
