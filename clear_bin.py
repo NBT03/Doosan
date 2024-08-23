@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     # Predefined grasping transformation wrt each object, i.e.,
     #  when an object i loaded at basePosition [0,0,0] and baseOrientation [0,0,0]
-    #  is attempted to grasp at corresponding object_grasp_positions[i] and 
+    #  is attempted to grasp at corresponding object_grasp_positions[i] and
     #  object_grasp_angles[i], it will result in a successfull grasp.
     object_grasp_positions = [
         np.array([[0, 0, 0, 1]]).transpose(),
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ]
     object_grasp_angles = [0, 0, 0]
 
-    # setup camera (this should be consistent with the camera 
+    # setup camera (this should be consistent with the camera
     #   used during training segmentation model)
     my_camera = camera.Camera(
         image_size=(480, 640),
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             is_grasped[obj_index] = True
 
             # Get a list of robot configurations in small step sizes
-            path_conf = main.rrt_star(env.robot_home_joint_config,
+            path_conf = main.rrt(env.robot_home_joint_config,
                                  env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5, env)
             if path_conf is None:
                 print(

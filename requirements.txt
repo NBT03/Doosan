@@ -5,11 +5,11 @@ lazy-object-proxy==1.4.3
 llvmlite==0.34.0
 mccabe==0.6.1
 numba==0.51.1
-numpy==1.19.1
-opencv-python==4.4.0.42
+numpy==1.26.4
+opencv-python
 Pillow==7.2.0
 ply==3.11
-pybullet==2.8.4
+pybullet
 pylint==2.5.3
 scipy==1.5.2
 six==1.15.0

@@ -315,7 +315,7 @@ if __name__ == "__main__":
 
     # TODO: Prepare train and test Dataloaders. Use appropriate batch size
     # ===============================================================================
-    train_loader = DataLoader(train_dataset, batch_size=8)
+    train_loader = DataLoader(train_dataset, batch_size=2)
     test_loader = DataLoader(test_dataset)
     # ===============================================================================
 
