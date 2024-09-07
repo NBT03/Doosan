@@ -7,7 +7,7 @@ import sim
 import threading
 # Constants
 MAX_ITERS = 10000
-delta_q = 0.5  # Step size
+delta_q = 0.3  # Step size
 
 
 class Node:
@@ -163,7 +163,7 @@ def run_dynamic_rrt_star():
                 env.set_joint_positions(env.robot_home_joint_config)
                 markers = []
                 for joint_state in path_conf:
-                    env.move_joints(joint_state, speed=0.01)
+                    env.move_joints(joint_state, speed=0.005)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                     markers.append(sim.SphereMarker(link_state[0], radius=0.02))
                 print("Path executed. Dropping the object")
@@ -175,7 +175,7 @@ def run_dynamic_rrt_star():
                                               env.robot_home_joint_config, MAX_ITERS, delta_q, 0.5, velocities)
                 if path_conf1:
                     for joint_state in path_conf1:
-                        env.move_joints(joint_state, speed=0.01)
+                        env.move_joints(joint_state, speed=0.005)
                         link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                         markers.append(sim.SphereMarker(link_state[0], radius=0.02))
                 markers = None

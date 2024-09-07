@@ -34,7 +34,7 @@ class PyBulletSim:
         else:
             p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        self._plane_id = p.loadURDF("plane.urdf")
+        self._plane_id = p.loadURDF("assets/ur5/plane.urdf")
         p.setGravity(0, 0, -9.8)
 
         # load UR5 robot

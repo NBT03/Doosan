@@ -6,7 +6,7 @@ def transform_is_valid(t, tolerance=1e-3):
     In:
         t: Numpy array [4x4] that is an transform candidate.
         tolerance: maximum absolute difference for two numbers to be considered close enough to each other.
-    Out: 
+    Out:
         bool: True if array is a valid transform else False.
     Purpose:
         Check if array is a valid transform.
@@ -25,10 +25,10 @@ def transform_is_valid(t, tolerance=1e-3):
 
 def transform_concat(t1, t2):
     '''
-    In: 
+    In:
         t1: Numpy array [4x4], left transform.
         t2: Numpy array [4x4], right transform.
-    Out: 
+    Out:
         t1 * t2 as a numpy arrays [4x4].
     Purpose:
         Concatenate transforms.
@@ -106,7 +106,7 @@ def camera_to_image(intrinsics, camera_points):
 
 def depth_to_point_cloud(intrinsics, depth_image):
     '''
-    In: 
+    In:
         intrinsics:  Numpy array [3x3] given as [[fx, 0, u0], [0, fy, v0], [0, 0, 1]]
         depth_image: Numpy array [lxw] where each value is the z-depth value
     Out:
@@ -132,3 +132,4 @@ def depth_to_point_cloud(intrinsics, depth_image):
                     depth_image[v, u]]))
 
     return point_cloud
+
