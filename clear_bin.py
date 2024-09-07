@@ -16,25 +16,14 @@ import transforms3d
 import random
 import main
 from train_seg_model import RGBDataset
+import threading
 
 
-if __name__ == "__main__":
-    random.seed(1)
-    color_palette = train_seg_model.get_tableau_palette()
 
-    # Note: Please don't change the order in object_shapes and object_meshes array.
-    #   their order is consistent with the trained segmentation model.
-    object_shapes = [
-        "assets/objects/cube.urdf",
-        "assets/objects/rod.urdf",
-        "assets/objects/custom.urdf",
-    ]
-    object_meshes = [
-        "assets/objects/cube.obj",
-        "assets/objects/rod.obj",
-        "assets/objects/custom.obj",
-    ]
-    env = sim.PyBulletSim(object_shapes = object_shapes)
+
+# Note: Please don't change the order in object_shapes and object_meshes array.
+#   their order is consistent with the trained segmentation model.
+def run_dynamic_rrt_star():
     env.load_gripper()
 
     # Predefined grasping transformation wrt each object, i.e.,
@@ -184,10 +173,10 @@ if __name__ == "__main__":
 
         if grasp_success:  # Move the object to another tote
             is_grasped[obj_index] = True
-
+            velocities = [0.01]
             # Get a list of robot configurations in small step sizes
-            path_conf = main.rrt(env.robot_home_joint_config,
-                                 env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5, env)
+            path_conf = main.dynamic_rrt_star(env, env.robot_home_joint_config,
+                                 env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5,env.velocities)
             if path_conf is None:
                 print(
                     "no collision-free path is found within the time budget. continuing ...")
@@ -198,7 +187,7 @@ if __name__ == "__main__":
                 # set joint back to home before execute path
                 env.set_joint_positions(env.robot_home_joint_config)
                 for joint_state in path_conf:
-                    env.move_joints(joint_state, speed=0.05)
+                    env.move_joints(joint_state, speed=0.003)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                     markers.append(sim.SphereMarker(link_state[0], radius=0.02))
                 # ===============================================================================
@@ -214,11 +203,40 @@ if __name__ == "__main__":
 
                 # Retrace the path to original location
                 # ===============================================================================
-                for joint_state in reversed(path_conf):
-                    env.move_joints(joint_state, speed=0.1)
+                path_conf1 = main.dynamic_rrt_star(env, env.robot_goal_joint_config,
+                                                  env.robot_home_joint_config, main.MAX_ITERS, main.delta_q, 0.5,
+                                                  env.velocities)
+                if path_conf1:
+                    for joint_state in path_conf1:
+                        env.move_joints(joint_state, speed=0.003)
+                        link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
+                        markers.append(sim.SphereMarker(link_state[0], radius=0.02))
+                markers = None
 
                 # ===============================================================================
             p.removeAllUserDebugItems()
 
         markers = None
         env.robot_go_home()
+if __name__ == "__main__":
+    random.seed(1)
+    color_palette = train_seg_model.get_tableau_palette()
+    object_shapes = [
+            "assets/objects/cube.urdf",
+            "assets/objects/rod.urdf",
+            "assets/objects/custom.urdf",
+        ]
+    object_meshes = [
+            "assets/objects/cube.obj",
+            "assets/objects/rod.obj",
+            "assets/objects/custom.obj",
+        ]
+    env = sim.PyBulletSim(object_shapes = object_shapes)
+    def move_ostacles():
+       env.update_moving_obstacles()
+    drrt = threading.Thread(target=run_dynamic_rrt_star)
+    a = threading.Thread(target=move_ostacles)
+    drrt.start()
+    a.start()
+    drrt.join()
+    a.join()
