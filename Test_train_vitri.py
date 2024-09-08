@@ -1,127 +1,145 @@
+# lstm_prediction.py
+
+import pybullet as p
+import pybullet_data
 import numpy as np
-import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from torch import nn, optim
-import pandas as pd
-import numpy as np
-
-# Tạo dữ liệu giả định với các tọa độ x, y, z cho các quỹ đạo khác nhau
-num_samples = 1000
-time = np.linspace(0, 10, num_samples)
-
-# Quỹ đạo thẳng
-x_straight = time
-y_straight = 2 * time
-z_straight = 0.5 * time
-
-# Quỹ đạo parabol
-x_parabola = time
-y_parabola = time**2
-z_parabola = 0.5 * time**2
-
-# Quỹ đạo sin
-x_sin = np.sin(time)
-y_sin = np.sin(2 * time)
-z_sin = np.sin(0.5 * time)
-
-# Tạo dataframe và lưu vào file CSV
-data = pd.DataFrame({
-    'x': np.concatenate([x_straight, x_parabola, x_sin]),
-    'y': np.concatenate([y_straight, y_parabola, y_sin]),
-    'z': np.concatenate([z_straight, z_parabola, z_sin])
-})
-
-data.to_csv('trajectories.csv', index=False)
-# Load and normalize the dataset
-data = pd.read_csv('trajectories.csv')
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_data = scaler.fit_transform(data[['x', 'y', 'z']])
-
-# Prepare the sequences
-def create_sequences(data, seq_length):
-    xs, ys = [], []
-    for i in range(len(data) - seq_length):
-        x = data[i:(i + seq_length)]
-        y = data[i + seq_length]
-        xs.append(x)
-        ys.append(y)
-    return np.array(xs), np.array(ys)
-
-sequence_length = 10
-X, y = create_sequences(scaled_data, sequence_length)
-
-# Convert to PyTorch tensors
-X_tensor = torch.tensor(X, dtype=torch.float32)
-y_tensor = torch.tensor(y, dtype=torch.float32)
-
-# Create DataLoader for training and testing
-train_size = int(0.8 * len(X_tensor))
-train_dataset = TensorDataset(X_tensor[:train_size], y_tensor[:train_size])
-test_dataset = TensorDataset(X_tensor[train_size:], y_tensor[train_size:])
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+import matplotlib.pyplot as plt
 
 
+# Hàm tạo dữ liệu trong PyBullet
+def generate_data():
+    p.connect(p.DIRECT)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.loadURDF("plane.urdf")
+
+    object_id = p.loadURDF("r2d2.urdf")
+    positions = []
+
+    for step in range(1000):
+        # Di chuyển vật thể theo các quỹ đạo khác nhau
+        x = step * 0.01
+        y = np.sin(x)
+        z = 0
+        p.resetBasePositionAndOrientation(object_id, [x, y, z], [0, 0, 0, 1])
+        position = p.getBasePositionAndOrientation(object_id)[0]
+        positions.append(position)
+
+    p.disconnect()
+    return np.array(positions)
+
+
+# Tạo và chuẩn bị dữ liệu
+data = generate_data()
+train_data = torch.tensor(data[:-1], dtype=torch.float32)
+target_data = torch.tensor(data[1:], dtype=torch.float32)
+dataset = TensorDataset(train_data, target_data)
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+
+# Định nghĩa mô hình LSTM
 class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(LSTMModel, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-
-        out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
+        out, _ = self.lstm(x)
+        out = self.fc(out)
         return out
 
 
-# Hyperparameters
-input_size = 3
-hidden_size = 50
-num_layers = 2
-output_size = 3
-
-model = LSTMModel(input_size, hidden_size, num_layers, output_size)
-# Loss and optimizer
+# Thiết lập thông số mô hình
+model = LSTMModel(input_size=3, hidden_size=50, output_size=3)
 criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-# Training loop
-num_epochs = 100
-model.train()
-
-for epoch in range(num_epochs):
-    for inputs, targets in train_loader:
+# Huấn luyện mô hình
+epochs = 1000
+for epoch in range(epochs):
+    for inputs, targets in dataloader:
         optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
+        outputs = model(inputs.unsqueeze(1))
+        loss = criterion(outputs.squeeze(1), targets)
         loss.backward()
         optimizer.step()
+    print(f"Epoch {epoch + 1}/{epochs}, Loss: {loss.item():.4f}")
 
-    print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}')
-model.eval()
-predictions, actuals = [], []
 
-with torch.no_grad():
-    for inputs, targets in test_loader:
-        outputs = model(inputs)
-        predictions.extend(outputs.numpy())
-        actuals.extend(targets.numpy())
+# Hàm dự đoán vị trí tương lai
+def predict_future_positions(model, input_data, future_steps):
+    model.eval()
+    predictions = []
+    input_seq = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0)
 
-predictions = scaler.inverse_transform(predictions)
-actuals = scaler.inverse_transform(actuals)
+    for _ in range(future_steps):
+        with torch.no_grad():
+            output = model(input_seq)
+            predictions.append(output.squeeze(0).numpy())
+            input_seq = output
 
-# Calculate errors
-mae = np.mean(np.abs(predictions - actuals))
-mse = np.mean((predictions - actuals) ** 2)
-rmse = np.sqrt(mse)
+    predictions = np.array(predictions)
+    predictions = np.squeeze(predictions)  # Loại bỏ chiều thừa
+    print(
+        f"Shape of predictions after conversion: {predictions.shape}")  # Kiểm tra kích thước mảng sau khi loại bỏ chiều thừa
+    return predictions
+# Dự đoán 100 bước tiếp theo từ dữ liệu ban đầu
+predicted_positions = predict_future_positions(model, data[-1:], future_steps=100)
+print(f"Shape of predicted_positions: {predicted_positions.shape}")  # Kiểm tra kích thước mảng dự đoán
 
-print(f"Mean Absolute Error (MAE): {mae:.4f}")
-print(f"Mean Squared Error (MSE): {mse:.4f}")
-print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
+
+# Vẽ đồ thị so sánh giữa tọa độ thực tế và dự đoán
+import torch
+import torch.nn as nn
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Các hàm và định nghĩa model của bạn ở đây
+
+def plot_comparison(actual_data, predicted_data, steps_to_plot=100):
+    actual_x = actual_data[-steps_to_plot:, 0]
+    actual_y = actual_data[-steps_to_plot:, 1]
+    actual_z = actual_data[-steps_to_plot:, 2]
+
+    predicted_x = predicted_data[:, 0]
+    predicted_y = predicted_data[:, 1]
+    predicted_z = predicted_data[:, 2]
+
+    plt.figure(figsize=(12, 6))
+
+    plt.subplot(3, 1, 1)
+    plt.plot(range(steps_to_plot), actual_x, label='Thực tế', color='b')
+    plt.plot(range(steps_to_plot), predicted_x, label='Dự đoán', color='r', linestyle='--')
+    plt.title('So sánh tọa độ X theo thời gian')
+    plt.xlabel('Thời gian (step)')
+    plt.ylabel('Tọa độ X')
+    plt.legend()
+
+    plt.subplot(3, 1, 2)
+    plt.plot(range(steps_to_plot), actual_y, label='Thực tế', color='b')
+    plt.plot(range(steps_to_plot), predicted_y, label='Dự đoán', color='r', linestyle='--')
+    plt.title('So sánh tọa độ Y theo thời gian')
+    plt.xlabel('Thời gian (step)')
+    plt.ylabel('Tọa độ Y')
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    plt.plot(range(steps_to_plot), actual_z, label='Thực tế', color='b')
+    plt.plot(range(steps_to_plot), predicted_z, label='Dự đoán', color='r', linestyle='--')
+    plt.title('So sánh tọa độ Z theo thời gian')
+    plt.xlabel('Thời gian (step)')
+    plt.ylabel('Tọa độ Z')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("comparison_plot.png")  # Lưu biểu đồ thành file PNG
+    plt.close()  # Đóng biểu đồ sau khi lưu
+
+# Gọi hàm train model và plot_comparison
+
+
+# Gọi hàm vẽ đồ thị
+plot_comparison(data, predicted_positions, steps_to_plot=1000)

@@ -25,15 +25,7 @@ def visualize_path(q_1, q_2, env, color=[0, 1, 0]):
     p.addUserDebugLine(point_1, point_2, color, 1.0)
 
 
-def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, velocities, distance=0.1):
-    velocities = [[0.01, 0.01, 0.01],
-                  [0.01, 0.05, -0.01],
-                  [0.01, -0.01, 0.01],
-                  [0.01, 0.01, 0],
-                  [0.01, 0.01, 0],
-                  [0.01, 0.01, 0],
-                  [0.01, 0.01, 0]
-                  ]
+def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p,distance=0.1):
     V, E = [Node(q_init)], []
     path, found = [], False
 

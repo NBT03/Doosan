@@ -7,7 +7,7 @@ class PyBulletSim:
     def __init__(self, use_random_objects=False, object_shapes=None, gui=True):
         self._workspace1_bounds = np.array([
             [-0.7, -0.55],  # 3x2 rows: x,y,z cols: min,max
-            [0, 0.15],
+            [0, 0.25],
             [0.83, 0.93]
         ])
         if gui:

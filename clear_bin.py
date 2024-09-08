@@ -14,10 +14,11 @@ import transforms
 from scipy.spatial.transform import Rotation
 import transforms3d
 import random
-import main
+import main_update
+from main_update import dynamic_rrt_star
 from train_seg_model import RGBDataset
 import threading
-
+import sim_update
 
 
 
@@ -47,12 +48,12 @@ def run_dynamic_rrt_star():
     )
     camera_target_position = (env._workspace1_bounds[:, 0] + env._workspace1_bounds[:, 1]) / 2
     camera_target_position[2] = 0
-    camera_distance = np.sqrt(((np.array([0.5, -0.5, 0.8]) - camera_target_position)**2).sum())
+    camera_distance = np.sqrt(((np.array([-0.6, 0.1, 1.2]) - camera_target_position)**2).sum())
     view_matrix = p.computeViewMatrixFromYawPitchRoll(
         cameraTargetPosition=camera_target_position,
-        distance=camera_distance,
+        distance=1.5,
         yaw=90,
-        pitch=-60,
+        pitch=-90,
         roll=0,
         upAxisIndex=2,
     )
@@ -92,7 +93,7 @@ def run_dynamic_rrt_star():
 
         markers = []
         # Points in each point cloud to use for ICP.
-        #   Adjust this as per your machine performance.
+        #   Adjust this as per your machine ormance.
         num_sample_pts = 500
 
         # Randomly choose an object index to grasp which is not grasped yet.
@@ -173,10 +174,9 @@ def run_dynamic_rrt_star():
 
         if grasp_success:  # Move the object to another tote
             is_grasped[obj_index] = True
-            velocities = [0.01]
             # Get a list of robot configurations in small step sizes
-            path_conf = main.dynamic_rrt_star(env, env.robot_home_joint_config,
-                                 env.robot_goal_joint_config, main.MAX_ITERS, main.delta_q, 0.5,env.velocities)
+            path_conf = main_update.dynamic_rrt_star(env, env.robot_home_joint_config,
+                                 env.robot_goal_joint_config, main_update.MAX_ITERS, main_update.delta_q, 0.5)
             if path_conf is None:
                 print(
                     "no collision-free path is found within the time budget. continuing ...")
@@ -203,9 +203,9 @@ def run_dynamic_rrt_star():
 
                 # Retrace the path to original location
                 # ===============================================================================
-                path_conf1 = main.dynamic_rrt_star(env, env.robot_goal_joint_config,
-                                                  env.robot_home_joint_config, main.MAX_ITERS, main.delta_q, 0.5,
-                                                  env.velocities)
+                path_conf1 = main_update.dynamic_rrt_star(env, env.robot_goal_joint_config,
+                                                  env.robot_home_joint_config, main_update.MAX_ITERS, main_update.delta_q, 0.5,
+                                                )
                 if path_conf1:
                     for joint_state in path_conf1:
                         env.move_joints(joint_state, speed=0.003)
@@ -231,12 +231,5 @@ if __name__ == "__main__":
             "assets/objects/rod.obj",
             "assets/objects/custom.obj",
         ]
-    env = sim.PyBulletSim(object_shapes = object_shapes)
-    def move_ostacles():
-       env.update_moving_obstacles()
-    drrt = threading.Thread(target=run_dynamic_rrt_star)
-    a = threading.Thread(target=move_ostacles)
-    drrt.start()
-    a.start()
-    drrt.join()
-    a.join()
+    env = sim_update.PyBulletSim(object_shapes = object_shapes)
+    run_dynamic_rrt_star()
