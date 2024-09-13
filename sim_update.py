@@ -6,8 +6,8 @@ import math
 class PyBulletSim:
     def __init__(self, use_random_objects=False, object_shapes=None, gui=True):
         self._workspace1_bounds = np.array([
-            [-0.7, -0.55],  # 3x2 rows: x,y,z cols: min,max
-            [0, 0.25],
+            [-0.7, -0.65],  # 3x2 rows: x,y,z cols: min,max
+            [0, 0.15],
             [0.83, 0.93]
         ])
         if gui:
@@ -51,7 +51,7 @@ class PyBulletSim:
         self.robot_goal_joint_config = [np.pi*(6/5),
                                         np.pi/3, np.pi / 6, 0, np.pi / (2.5), 0]
 
-        self.move_joints(self.robot_home_joint_config, speed=1.0)
+        self.move_joints(self.robot_home_joint_config, speed=0.05)
         self._tote_id = p.loadURDF(
             "assets/tote/tote_bin.urdf",[-0.8,0.3,0.84], p.getQuaternionFromEuler([np.pi/2, 0, 0]), useFixedBase=True)
         self._object_colors = get_tableau_palette()
@@ -75,7 +75,11 @@ class PyBulletSim:
         self.reset_objects()
         self.obstacles = [
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[-0.65, -0.25, 2],
+                       basePosition=[-0.65, -0.35, 1.5],
+                       useFixedBase=True
+                       ),
+            p.loadURDF('assets/obstacles/block.urdf',
+                       basePosition=[-0.55, -0.35, 1.5],
                        useFixedBase=True
                        ),
         ]
@@ -243,13 +247,22 @@ class PyBulletSim:
             p.resetJointState(self.robot_body_id, joint, value)
     def check_collision(self, q, distance=0.155):
         self.set_joint_positions(q)
+
+        # Lấy vị trí TCP (Tool Center Point)
+        tcp_position = p.getLinkState(self.robot_body_id, self.robot_end_effector_link_index)[0]
+
         for obstacle_id in self.obstacles:
+            # Kiểm tra khoảng cách từ TCP đến vật cản
             closest_points = p.getClosestPoints(
-                self.robot_body_id, obstacle_id, distance)
-            # print(closest_points)
+                self.robot_body_id, obstacle_id, distance, linkIndexA=self.robot_end_effector_link_index)
+
+            # Nếu có điểm nào trong phạm vi, báo va chạm
             if closest_points is not None and len(closest_points) != 0:
                 return True
+
+        # Nếu không có va chạm nào, trả về False
         return False
+
 
 class SphereMarker:
     def __init__(self, position, radius=0.05, rgba_color=(1, 0, 0, 0.8), text=None, orientation=None, p_id=0):

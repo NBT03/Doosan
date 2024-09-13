@@ -3,7 +3,8 @@ import random
 import numpy as np
 import math
 import pybullet as p
-import sim
+# import sim
+import sim_update
 import threading
 # Constants
 MAX_ITERS = 10000
@@ -41,7 +42,7 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, velo
         q_nearest = nearest([node.joint_positions for node in V], q_rand)
         q_new = steer(q_nearest, q_rand, delta_q)
 
-        if not env.predict_collision(q_new, velocities):
+        if not env.check_collision(q_new, distance=0.15):
             q_new_node = Node(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node
@@ -165,7 +166,7 @@ def run_dynamic_rrt_star():
                 for joint_state in path_conf:
                     env.move_joints(joint_state, speed=0.005)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
-                    markers.append(sim.SphereMarker(link_state[0], radius=0.02))
+                    markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 print("Path executed. Dropping the object")
                 env.open_gripper()
                 env.step_simulation(num_steps=5)
@@ -177,7 +178,7 @@ def run_dynamic_rrt_star():
                     for joint_state in path_conf1:
                         env.move_joints(joint_state, speed=0.005)
                         link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
-                        markers.append(sim.SphereMarker(link_state[0], radius=0.02))
+                        markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 markers = None
             p.removeAllUserDebugItems()
 
@@ -193,7 +194,7 @@ if __name__ == "__main__":
     object_shapes = [
         "assets/objects/cube.urdf",
     ]
-    env = sim.PyBulletSim(object_shapes=object_shapes)
+    env = sim_update.PyBulletSim(object_shapes=object_shapes)
     def move_ostacles():
        env.update_moving_obstacles()
     drrt = threading.Thread(target=run_dynamic_rrt_star)
