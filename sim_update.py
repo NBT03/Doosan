@@ -42,8 +42,8 @@ class PyBulletSim:
         self._joint_epsilon = 1e-2
 
         # Robot home joint configuration (over tote 1)
-        self.robot_home_joint_config = [np.pi,
-                                        0, np.pi / 2, 0, np.pi / 2, 0]
+        self.robot_home_joint_config = [np.pi*-0.5225555555555556,
+                                        np.pi*-0.07583333333333334, np.pi*0.5659444444444445, np.pi*0.008222222222222223, np.pi * 0.49961111111111123, np.pi * 0.020722222222222222]
         self.robot_after_grip = [np.pi,
                                         0, np.pi / 2, 0, np.pi / 2, 0]
 
