@@ -17,12 +17,12 @@ class RobotTrajectoryController(Node):
     def send_trajectory(self, trajectory):
         for joint_angles in trajectory:
             self.req.pos = joint_angles
-            self.req.vel = 30.0  # Tốc độ di chuyển
-            self.req.acc = 30.0  # Gia tốc
+            self.req.vel = 2000.0  # Tốc độ di chuyển
+            self.req.acc = 2000.0  # Gia tốc
             self.req.time = 0.0  # Thời gian thực hiện lệnh
             self.req.radius = 0.0  # Bán kính chuyển động tròn nếu cần
             self.req.mode = 0  # Chế độ điều khiển
-            self.req.blend_type = 0
+            self.req.blend_type = 1
             self.req.sync_type = 0
 
             future = self.client.call_async(self.req)
@@ -43,7 +43,9 @@ def main(args=None):
 
     # Danh sách các tập hợp góc khớp cần di chuyển
     trajectory_list = [
-        [0.0, 90.0, 0.0, 90.0, 50.0, 0.0],
+        [-94.06, -13.65, 101.87, 1.48, 89.39, 3.73],
+        [-35.00, 25.65, 60.87, 1.48, 89.39, 3.73],
+
         # Các tập hợp góc khớp khác
     ]
 

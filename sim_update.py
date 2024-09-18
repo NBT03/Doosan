@@ -6,9 +6,9 @@ import math
 class PyBulletSim:
     def __init__(self, use_random_objects=False, object_shapes=None, gui=True):
         self._workspace1_bounds = np.array([
-            [-0.7, -0.65],  # 3x2 rows: x,y,z cols: min,max
-            [0, 0.15],
-            [0.83, 0.93]
+            [-0.1, -0.15],  # 3x2 rows: x,y,z cols: min,max
+            [-0.51, -0.52],
+            [0.83, 0.84]
         ])
         if gui:
             p.connect(p.GUI)
@@ -22,10 +22,10 @@ class PyBulletSim:
         self.robot_body_id = p.loadURDF(
             "assets/ur5/doosan_origin.urdf", [0, 0, 0.83], p.getQuaternionFromEuler([0, 0, 0]))
 
-        self._base_id = p.loadURDF(
-            "assets/ur5/base_doosan.urdf", [0.33,-0.8,0], p.getQuaternionFromEuler([0,0,np.pi/2]),useFixedBase=True)
-        self._cabin_id = p.loadURDF(
-            "assets/ur5/Cabin.urdf",[-1.1,0.8,0], p.getQuaternionFromEuler([np.pi/2, 0, 0]), useFixedBase=True)
+        # self._base_id = p.loadURDF(
+        #     "assets/ur5/base_doosan.urdf", [0.75,0.3,0], p.getQuaternionFromEuler([0,0,np.pi]),useFixedBase=True)
+        # self._cabin_id = p.loadURDF(
+        #     "assets/ur5/Cabin.urdf",[-0.75,-1,0], p.getQuaternionFromEuler([np.pi/2, 0, np.pi/2]),useFixedBase=True)
         self._gripper_body_id = None
         self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
@@ -48,12 +48,16 @@ class PyBulletSim:
                                         0, np.pi / 2, 0, np.pi / 2, 0]
 
         # Robot goal joint configuration (over tote 2)
-        self.robot_goal_joint_config = [np.pi*(6/5),
-                                        np.pi/3, np.pi / 6, 0, np.pi / (2.5), 0]
+        self.robot_goal_joint_config = [ np.pi * (-35.00 / 180),
+                                        np.pi * (30 / 180),
+                                        np.pi * (60.87 / 180),
+                                        np.pi * (1.48 / 180),
+                                        np.pi * (89.39 / 180),
+                                        np.pi * (3.73 / 180)]
 
         self.move_joints(self.robot_home_joint_config, speed=0.05)
         self._tote_id = p.loadURDF(
-            "assets/tote/tote_bin.urdf",[-0.8,0.3,0.84], p.getQuaternionFromEuler([np.pi/2, 0, 0]), useFixedBase=True)
+            "assets/tote/tote_bin.urdf",[-0.3,-0.35,0.78], p.getQuaternionFromEuler([np.pi/2, 0, 0]), useFixedBase=True)
         self._object_colors = get_tableau_palette()
         # - Define possible object shapes
         if object_shapes is not None:
@@ -69,22 +73,22 @@ class PyBulletSim:
             i % len(self._object_shapes) for i in range(self._num_objects)]
         self._objects_body_ids = []
         for i in range(self._num_objects):
-            object_body_id = p.loadURDF(self._object_shapes[i], [-0.7,0.15,0.9], p.getQuaternionFromEuler([0, 0, 0]), useFixedBase= False)
+            object_body_id = p.loadURDF(self._object_shapes[i], [-0.6,-0.35,0.84], p.getQuaternionFromEuler([0, 0, 0]), useFixedBase=False)
             self._objects_body_ids.append(object_body_id)
             p.changeVisualShape(object_body_id, -1, rgbaColor=[*self._object_colors[i], 1])
         self.reset_objects()
         self.obstacles = [
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[-0.65, -0.35, 1.5],
+                       basePosition=[0.3, -0.45, 1.75],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[-0.55, -0.35, 1.5],
+                       basePosition=[0.55, 0.35, 1.5],
                        useFixedBase=True
                        ),
         ]
         self.obstacles.extend(
-            [self._plane_id, self._tote_id, self._cabin_id])
+            [self._plane_id, self._tote_id,])
 
     def load_gripper(self):
         if self._gripper_body_id is not None:
@@ -208,7 +212,7 @@ class PyBulletSim:
         self.move_tool(grasp_position, gripper_orientation)
         self.close_gripper()
         self.move_tool(post_grasp_position, None)
-        self.robot_go_after_grip(speed=0.03)
+        self.robot_go_home(speed=0.03)
         grasp_success = self.check_grasp_success()
         return grasp_success
     def execute_place(self, place_angle=90.):

@@ -9,9 +9,9 @@ import time
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 1.0    # Coefficient for attractive force
-k_rep = 1.0    # Coefficient for repulsive force
-d0 = 0.2       # Distance threshold for repulsive force
+k_att = 0.75    # Coefficient for attractive force
+k_rep = 0.5    # Coefficient for repulsive force
+d0 = 0.1       # Distance threshold for repulsive force
 
 
 class Node:
