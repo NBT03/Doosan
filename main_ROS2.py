@@ -6,6 +6,9 @@ import pybullet as p
 import sim_update
 import threading
 import time
+import rclpy
+from rclpy.node import Node
+from dsr_msgs2.srv import MoveJoint
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
@@ -13,8 +16,39 @@ k_att = 0.75    # Coefficient for attractive force
 k_rep = 0.5    # Coefficient for repulsive force
 d0 = 0.1       # Distance threshold for repulsive force
 
+class NodeROS(Node):
+    def __init__(self):
+        super().__init__('robot_trajectory_controller')
+        self.client = self.create_client(MoveJoint, '/dsr01/motion/move_joint')
 
-class Node:
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting again...')
+
+        self.req = MoveJoint.Request()
+
+    def send_trajectory(self, trajectory):
+        for joint_angles in trajectory:
+            joint_angles_in_degrees = [math.degrees(angle) for angle in joint_angles]  # Chuyển đổi radian sang độ
+            self.req.pos = joint_angles_in_degrees
+            self.req.vel = 2000.0  # Tốc độ di chuyển
+            self.req.acc = 2000.0  # Gia tốc
+            self.req.time = 0.0  # Thời gian thực hiện lệnh
+            self.req.radius = 0.0  # Bán kính chuyển động tròn nếu cần
+            self.req.mode = 0  # Chế độ điều khiển
+            self.req.blend_type = 1
+            self.req.sync_type = 0
+
+            future = self.client.call_async(self.req)
+            rclpy.spin_until_future_complete(self, future)
+
+            if future.result().success:
+                self.get_logger().info('Successfully moved to: %s' % joint_angles_in_degrees)
+            else:
+                self.get_logger().error('Failed to move to: %s' % joint_angles_in_degrees)
+            time.sleep(1.0)
+
+
+class NodeSim:
     def __init__(self, joint_positions, parent=None):
         self.joint_positions = joint_positions
         self.parent = parent
@@ -29,7 +63,7 @@ def visualize_path(q_1, q_2, env, color=[0, 1, 0]):
 
 
 def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, distance=0.1):
-    V, E = [Node(q_init)], []
+    V, E = [NodeSim(q_init)], []
     path, found = [], False
 
     for i in range(MAX_ITERS):
@@ -37,16 +71,14 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         q_nearest = nearest([node.joint_positions for node in V], q_rand)
         q_new = steer(q_nearest, q_rand, delta_q)
 
-        # Compute attractive and repulsive forces
         attractive = attractive_force(q_nearest, q_goal, k_att)
         obstacles = [node.joint_positions for node in V if node.joint_positions != q_nearest]
         repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
 
-        # Apply forces to new point
         q_new = [q_new[i] + attractive[i] + repulsive[i] for i in range(len(q_new))]
 
         if not env.check_collision(q_new, distance=0.1):
-            q_new_node = Node(q_new)
+            q_new_node = NodeSim(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node
 
@@ -56,7 +88,7 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
                 E.append((q_nearest_node, q_new_node))
                 visualize_path(q_nearest, q_new, env)
             if get_euclidean_distance(q_goal, q_new) < delta_q:
-                q_goal_node = Node(q_goal, q_new_node)
+                q_goal_node = NodeSim(q_goal, q_new_node)
                 V.append(q_goal_node)
                 E.append((q_new_node, q_goal_node))
                 visualize_path(q_new, q_goal, env)
@@ -122,33 +154,30 @@ def repulsive_force(q_current, obstacles, k_rep, d0):
     return force
 
 
-def get_grasp_position_angle(object_id):
-    position, grasp_angle = np.zeros((3, 1)), 0
-    position, orientation = p.getBasePositionAndOrientation(object_id)
-    grasp_angle = p.getEulerFromQuaternion(orientation)[2]
-    return position, grasp_angle
-
-
 def run_dynamic_rrt_star():
+    rclpy.init(args=None)
+    ros_node = NodeROS()
+
     env.load_gripper()
     passed = 0
     for _ in range(10):
         object_id = env._objects_body_ids[0]
-        position, grasp_angle = get_grasp_position_angle(object_id)
+        position, grasp_angle = p.getBasePositionAndOrientation(object_id)
+        grasp_angle = p.getEulerFromQuaternion(grasp_angle)[2]
         grasp_success = env.execute_grasp(position, grasp_angle)
+
         if grasp_success:
             path_conf = dynamic_rrt_star(env, env.robot_home_joint_config,
                                          env.robot_goal_joint_config, MAX_ITERS, delta_q, 0.5)
-            print(path_conf)
-            if path_conf is None:
-                print("No collision-free path is found within the time budget. Continuing ...")
-            else:
+            if path_conf:
                 env.set_joint_positions(env.robot_home_joint_config)
                 markers = []
                 for joint_state in path_conf:
                     env.move_joints(joint_state, speed=0.05)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                     markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
+                ros_node.send_trajectory(path_conf)  # Gửi path_conf qua ROS2
+
                 print("Path executed. Dropping the object")
                 env.open_gripper()
                 env.step_simulation(num_steps=5)
@@ -161,9 +190,10 @@ def run_dynamic_rrt_star():
                         env.move_joints(joint_state, speed=0.05)
                         link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                         markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
+                    ros_node.send_trajectory(path_conf1)  # Gửi path_conf1 qua ROS2
+
                 markers = None
             p.removeAllUserDebugItems()
-
         env.robot_go_home()
         object_pos, _ = p.getBasePositionAndOrientation(object_id)
         if object_pos[0] >= -0.8 and object_pos[0] <= -0.2 and \
@@ -171,12 +201,11 @@ def run_dynamic_rrt_star():
                 object_pos[2] <= 0.2:
             passed += 1
         env.reset_objects()
+    rclpy.shutdown()
 
 
 if __name__ == "__main__":
     random.seed(1)
-    object_shapes = [
-        "assets/objects/cube.urdf",
-    ]
+    object_shapes = ["assets/objects/cube.urdf"]
     env = sim_update.PyBulletSim(object_shapes=object_shapes)
     run_dynamic_rrt_star()
