@@ -14,7 +14,7 @@ MAX_ITERS = 10000
 delta_q = 0.1  # Step size
 k_att = 0.75    # Coefficient for attractive force
 k_rep = 0.5    # Coefficient for repulsive force
-d0 = 0.1       # Distance threshold for repulsive force
+d0 = 0.1       # Distance threshold for repulsive forcecle
 
 class NodeROS(Node):
     def __init__(self):

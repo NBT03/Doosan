@@ -6,8 +6,8 @@ import math
 class PyBulletSim:
     def __init__(self, use_random_objects=False, object_shapes=None, gui=True):
         self._workspace1_bounds = np.array([
-            [-0.1, -0.15],  # 3x2 rows: x,y,z cols: min,max
-            [-0.51, -0.52],
+            [-0.16, -0.17],  # 3x2 rows: x,y,z cols: min,max
+            [-0.55, -0.57],
             [0.83, 0.84]
         ])
         if gui:
@@ -43,12 +43,16 @@ class PyBulletSim:
 
         # Robot home joint configuration (over tote 1)
         self.robot_home_joint_config = [np.pi*-0.5225555555555556,
-                                        np.pi*-0.07583333333333334, np.pi*0.5659444444444445, np.pi*0.008222222222222223, np.pi * 0.49961111111111123, np.pi * 0.020722222222222222]
+                                        np.pi*-0.07583333333333334,
+                                        np.pi*0.5659444444444445,
+                                        np.pi*0.008222222222222223,
+                                        np.pi * 0.49961111111111123,
+                                        np.pi * 0.020722222222222222]
         self.robot_after_grip = [np.pi,
                                         0, np.pi / 2, 0, np.pi / 2, 0]
 
         # Robot goal joint configuration (over tote 2)
-        self.robot_goal_joint_config = [ np.pi * (-35.00 / 180),
+        self.robot_goal_joint_config = [ np.pi * (-10.00 / 180),
                                         np.pi * (30 / 180),
                                         np.pi * (60.87 / 180),
                                         np.pi * (1.48 / 180),
