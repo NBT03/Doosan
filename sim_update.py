@@ -11,7 +11,7 @@ class PyBulletSim:
             [0.83, 0.84]
         ])
         if gui:
-            p.connect(p.GUI)
+            p.connect(p.DIRECT)
         else:
             p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -22,10 +22,10 @@ class PyBulletSim:
         self.robot_body_id = p.loadURDF(
             "assets/ur5/doosan_origin.urdf", [0, 0, 0.83], p.getQuaternionFromEuler([0, 0, 0]))
 
-        # self._base_id = p.loadURDF(
-        #     "assets/ur5/base_doosan.urdf", [0.75,0.3,0], p.getQuaternionFromEuler([0,0,np.pi]),useFixedBase=True)
-        # self._cabin_id = p.loadURDF(
-        #     "assets/ur5/Cabin.urdf",[-0.75,-1,0], p.getQuaternionFromEuler([np.pi/2, 0, np.pi/2]),useFixedBase=True)
+        self._base_id = p.loadURDF(
+            "assets/ur5/base_doosan.urdf", [0.75,0.3,0], p.getQuaternionFromEuler([0,0,np.pi]),useFixedBase=True)
+        self._cabin_id = p.loadURDF(
+            "assets/ur5/Cabin.urdf",[-0.75,-1,0], p.getQuaternionFromEuler([np.pi/2, 0, np.pi/2]),useFixedBase=True)
         self._gripper_body_id = None
         self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
@@ -39,7 +39,7 @@ class PyBulletSim:
             x[0] for x in robot_joint_info if x[2] == p.JOINT_REVOLUTE]
 
         # joint position threshold in radians (i.e. move until joint difference < epsilon)
-        self._joint_epsilon = 1e-2
+        self._joint_epsilon = 1e-3
 
         # Robot home joint configuration (over tote 1)
         self.robot_home_joint_config = [np.pi*-0.5225555555555556,
@@ -83,16 +83,37 @@ class PyBulletSim:
         self.reset_objects()
         self.obstacles = [
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.3, -0.45, 1.75],
+                       basePosition=[0.35, -0.45, 1.25],
                        useFixedBase=True
                        ),
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.55, 0.35, 1.5],
+                       basePosition=[0.35, -0.45, 1.5],
                        useFixedBase=True
                        ),
         ]
         self.obstacles.extend(
             [self._plane_id, self._tote_id,])
+
+    def get_distance_to_obstacle(self, q_nearest, obstacle):
+        # Đặt cấu hình của robot tại q_nearest
+        self.set_joint_positions(q_nearest)
+
+        # Lấy vị trí hiện tại của end-effector (hoặc vị trí quan trọng bạn muốn)
+        end_effector_pos = p.getLinkState(self.robot_body_id, self.robot_end_effector_link_index)[0]
+
+        # Lấy vị trí của obstacle
+        obstacle_pos, _ = p.getBasePositionAndOrientation(obstacle)
+
+        # Tính khoảng cách Euclid giữa end-effector và obstacle
+        distance = np.linalg.norm(np.array(end_effector_pos) - np.array(obstacle_pos))
+
+        return distance
+    def get_obstacles_positions(self):
+        obstacle_positions = []
+        for obstacle_id in self._objects_body_ids:  # assuming you store the obstacle IDs in _objects_body_ids
+            pos, _ = p.getBasePositionAndOrientation(obstacle_id)
+            obstacle_positions.append(pos)
+        return obstacle_positions
 
     def load_gripper(self):
         if self._gripper_body_id is not None:
@@ -253,7 +274,7 @@ class PyBulletSim:
         assert len(self._robot_joint_indices) == len(values)
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
-    def check_collision(self, q, distance=0.155):
+    def check_collision(self, q, distance=0.05):
         self.set_joint_positions(q)
 
         # Lấy vị trí TCP (Tool Center Point)

@@ -9,8 +9,8 @@ import time
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 0.75    # Coefficient for attractive force
-k_rep = 0.1    # Coefficient for repulsive force
+k_att = 0.55   # Coefficient for attractive force
+k_rep = 1   # Coefficient for repulsive force
 d0 = 0.1      # Distance threshold for repulsive force
 
 
@@ -43,6 +43,14 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
 
         # Apply forces to new point
+        # Thay đổi đoạn này trong dynamic_rrt_star
+        # Compute forces and limit total force
+        max_force = 0.75  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        total_force = apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force)
+
+        # Apply forces to new point
+        q_new = [q_new[i] + total_force[i] for i in range(len(q_new))]
+
         q_new = [q_new[i] + attractive[i] + repulsive[i] for i in range(len(q_new))]
 
         if not env.check_collision(q_new, distance=0.1):
@@ -129,6 +137,22 @@ def get_grasp_position_angle(object_id):
     return position, grasp_angle
 
 
+def apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force):
+    attractive = attractive_force(q_nearest, q_goal, k_att)
+    repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
+
+    # Tính tổng lực
+    total_force = [attractive[i] + repulsive[i] for i in range(len(attractive))]
+
+    # Giới hạn lực tổng theo max_force
+    force_magnitude = np.linalg.norm(total_force)
+    if force_magnitude > max_force:
+        scaling_factor = max_force / force_magnitude
+        total_force = [f * scaling_factor for f in total_force]
+
+    return total_force
+
+
 def run_dynamic_rrt_star():
     env.load_gripper()
     passed = 0
@@ -146,7 +170,7 @@ def run_dynamic_rrt_star():
                 env.set_joint_positions(env.robot_home_joint_config)
                 markers = []
                 for joint_state in path_conf:
-                    env.move_joints(joint_state, speed=0.05)
+                    env.move_joints(joint_state, speed=0.005)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                     markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 print("Path executed. Dropping the object")
@@ -154,11 +178,10 @@ def run_dynamic_rrt_star():
                 env.step_simulation(num_steps=5)
                 env.close_gripper()
 
-                path_conf1 = dynamic_rrt_star(env, env.robot_goal_joint_config,
-                                              env.robot_home_joint_config, MAX_ITERS, delta_q, 0.5)
+                path_conf1 = path_conf[::-1]
                 if path_conf1:
                     for joint_state in path_conf1:
-                        env.move_joints(joint_state, speed=0.05)
+                        env.move_joints(joint_state, speed=0.005)
                         link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                         markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 markers = None

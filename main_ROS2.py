@@ -12,9 +12,10 @@ from dsr_msgs2.srv import MoveJoint
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 0.75    # Coefficient for attractive force
-k_rep = 0.5    # Coefficient for repulsive force
-d0 = 0.1       # Distance threshold for repulsive forcecle
+k_att = 0.55   # Coefficient for attractive force
+k_rep = 1   # Coefficient for repulsive force
+d0 = 0.1      # Distance threshold for repulsive force
+
 
 class NodeROS(Node):
     def __init__(self):
@@ -30,8 +31,8 @@ class NodeROS(Node):
         for joint_angles in trajectory:
             joint_angles_in_degrees = [math.degrees(angle) for angle in joint_angles]  # Chuyển đổi radian sang độ
             self.req.pos = joint_angles_in_degrees
-            self.req.vel = 2000.0  # Tốc độ di chuyển
-            self.req.acc = 2000.0  # Gia tốc
+            self.req.vel = 100.0  # Tốc độ di chuyển
+            self.req.acc = 100.0  # Gia tốc
             self.req.time = 0.0  # Thời gian thực hiện lệnh
             self.req.radius = 0.0  # Bán kính chuyển động tròn nếu cần
             self.req.mode = 0  # Chế độ điều khiển
@@ -74,6 +75,12 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         attractive = attractive_force(q_nearest, q_goal, k_att)
         obstacles = [node.joint_positions for node in V if node.joint_positions != q_nearest]
         repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
+
+        max_force = 0.75  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        total_force = apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force)
+
+        # Apply forces to new point
+        q_new = [q_new[i] + total_force[i] for i in range(len(q_new))]
 
         q_new = [q_new[i] + attractive[i] + repulsive[i] for i in range(len(q_new))]
 
@@ -152,7 +159,25 @@ def repulsive_force(q_current, obstacles, k_rep, d0):
             for i in range(len(force)):
                 force[i] += repulsive_magnitude * (q_current[i] - obs[i]) / dist
     return force
+def get_grasp_position_angle(object_id):
+    position, grasp_angle = np.zeros((3, 1)), 0
+    position, orientation = p.getBasePositionAndOrientation(object_id)
+    grasp_angle = p.getEulerFromQuaternion(orientation)[2]
+    return position, grasp_angle
+def apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force):
+    attractive = attractive_force(q_nearest, q_goal, k_att)
+    repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
 
+    # Tính tổng lực
+    total_force = [attractive[i] + repulsive[i] for i in range(len(attractive))]
+
+    # Giới hạn lực tổng theo max_force
+    force_magnitude = np.linalg.norm(total_force)
+    if force_magnitude > max_force:
+        scaling_factor = max_force / force_magnitude
+        total_force = [f * scaling_factor for f in total_force]
+
+    return total_force
 
 def run_dynamic_rrt_star():
     rclpy.init(args=None)
@@ -162,8 +187,7 @@ def run_dynamic_rrt_star():
     passed = 0
     for _ in range(10):
         object_id = env._objects_body_ids[0]
-        position, grasp_angle = p.getBasePositionAndOrientation(object_id)
-        grasp_angle = p.getEulerFromQuaternion(grasp_angle)[2]
+        position, grasp_angle = get_grasp_position_angle(object_id)
         grasp_success = env.execute_grasp(position, grasp_angle)
 
         if grasp_success:
@@ -183,8 +207,7 @@ def run_dynamic_rrt_star():
                 env.step_simulation(num_steps=5)
                 env.close_gripper()
 
-                path_conf1 = dynamic_rrt_star(env, env.robot_goal_joint_config,
-                                              env.robot_home_joint_config, MAX_ITERS, delta_q, 0.5)
+                path_conf1 = path_conf[::-1]
                 if path_conf1:
                     for joint_state in path_conf1:
                         env.move_joints(joint_state, speed=0.05)
