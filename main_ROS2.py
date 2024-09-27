@@ -12,8 +12,8 @@ from dsr_msgs2.srv import MoveJoint
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 0.55   # Coefficient for attractive force
-k_rep = 1   # Coefficient for repulsive force
+k_att = 1.5   # Coefficient for attractive force
+k_rep = 1.2   # Coefficient for repulsive force
 d0 = 0.1      # Distance threshold for repulsive force
 
 
@@ -31,8 +31,8 @@ class NodeROS(Node):
         for joint_angles in trajectory:
             joint_angles_in_degrees = [math.degrees(angle) for angle in joint_angles]  # Chuyển đổi radian sang độ
             self.req.pos = joint_angles_in_degrees
-            self.req.vel = 100.0  # Tốc độ di chuyển
-            self.req.acc = 100.0  # Gia tốc
+            self.req.vel = 1000.0  # Tốc độ di chuyển
+            self.req.acc = 1000.0  # Gia tốc
             self.req.time = 0.0  # Thời gian thực hiện lệnh
             self.req.radius = 0.0  # Bán kính chuyển động tròn nếu cần
             self.req.mode = 0  # Chế độ điều khiển
@@ -76,15 +76,19 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         obstacles = [node.joint_positions for node in V if node.joint_positions != q_nearest]
         repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
 
-        max_force = 0.75  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        max_force = 1  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        q_new = steer(q_nearest, q_rand, delta_q)
+        # Apply forces to new point
         total_force = apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force)
 
-        # Apply forces to new point
+        # Đảm bảo q_new vẫn trong giới hạn delta_q sau khi áp dụng lực
         q_new = [q_new[i] + total_force[i] for i in range(len(q_new))]
 
-        q_new = [q_new[i] + attractive[i] + repulsive[i] for i in range(len(q_new))]
+        # Giới hạn bước di chuyển sau khi cộng thêm lực
+        if get_euclidean_distance(q_new, q_nearest) > delta_q:
+            q_new = steer(q_nearest, q_new, delta_q)
 
-        if not env.check_collision(q_new, distance=0.1):
+        if not env.check_collision(q_new, distance=0.15):
             q_new_node = NodeSim(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node
@@ -175,6 +179,11 @@ def apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force):
     force_magnitude = np.linalg.norm(total_force)
     if force_magnitude > max_force:
         scaling_factor = max_force / force_magnitude
+        total_force = [f * scaling_factor for f in total_force]
+
+    # Tính toán tổng lực sau khi giới hạn và đảm bảo di chuyển trong khoảng delta_q
+    if force_magnitude > delta_q:
+        scaling_factor = delta_q / force_magnitude
         total_force = [f * scaling_factor for f in total_force]
 
     return total_force

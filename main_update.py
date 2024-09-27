@@ -9,8 +9,8 @@ import time
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 0.55   # Coefficient for attractive force
-k_rep = 1   # Coefficient for repulsive force
+k_att = 1.5   # Coefficient for attractive force
+k_rep = 1.2   # Coefficient for repulsive force
 d0 = 0.1      # Distance threshold for repulsive force
 
 
@@ -35,7 +35,6 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
     for i in range(MAX_ITERS):
         q_rand = semi_random_sample(steer_goal_p, q_goal)
         q_nearest = nearest([node.joint_positions for node in V], q_rand)
-        q_new = steer(q_nearest, q_rand, delta_q)
 
         # Compute attractive and repulsive forces
         attractive = attractive_force(q_nearest, q_goal, k_att)
@@ -45,15 +44,19 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         # Apply forces to new point
         # Thay đổi đoạn này trong dynamic_rrt_star
         # Compute forces and limit total force
-        max_force = 0.75  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        max_force = 1  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
+        q_new = steer(q_nearest, q_rand, delta_q)
+        # Apply forces to new point
         total_force = apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force)
 
-        # Apply forces to new point
+        # Đảm bảo q_new vẫn trong giới hạn delta_q sau khi áp dụng lực
         q_new = [q_new[i] + total_force[i] for i in range(len(q_new))]
 
-        q_new = [q_new[i] + attractive[i] + repulsive[i] for i in range(len(q_new))]
+        # Giới hạn bước di chuyển sau khi cộng thêm lực
+        if get_euclidean_distance(q_new, q_nearest) > delta_q:
+            q_new = steer(q_nearest, q_new, delta_q)
 
-        if not env.check_collision(q_new, distance=0.1):
+        if not env.check_collision(q_new, distance=0.15):
             q_new_node = Node(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node
@@ -150,13 +153,19 @@ def apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force):
         scaling_factor = max_force / force_magnitude
         total_force = [f * scaling_factor for f in total_force]
 
+    # Tính toán tổng lực sau khi giới hạn và đảm bảo di chuyển trong khoảng delta_q
+    if force_magnitude > delta_q:
+        scaling_factor = delta_q / force_magnitude
+        total_force = [f * scaling_factor for f in total_force]
+
     return total_force
+
 
 
 def run_dynamic_rrt_star():
     env.load_gripper()
     passed = 0
-    for _ in range(10):
+    for _ in range(100):
         object_id = env._objects_body_ids[0]
         position, grasp_angle = get_grasp_position_angle(object_id)
         grasp_success = env.execute_grasp(position, grasp_angle)
@@ -170,7 +179,7 @@ def run_dynamic_rrt_star():
                 env.set_joint_positions(env.robot_home_joint_config)
                 markers = []
                 for joint_state in path_conf:
-                    env.move_joints(joint_state, speed=0.005)
+                    env.move_joints(joint_state, speed=0.1)
                     link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                     markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 print("Path executed. Dropping the object")
@@ -181,7 +190,7 @@ def run_dynamic_rrt_star():
                 path_conf1 = path_conf[::-1]
                 if path_conf1:
                     for joint_state in path_conf1:
-                        env.move_joints(joint_state, speed=0.005)
+                        env.move_joints(joint_state, speed=0.1)
                         link_state = p.getLinkState(env.robot_body_id, env.robot_end_effector_link_index)
                         markers.append(sim_update.SphereMarker(link_state[0], radius=0.02))
                 markers = None
