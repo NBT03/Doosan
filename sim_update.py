@@ -11,7 +11,7 @@ class PyBulletSim:
             [0.83, 0.84]
         ])
         if gui:
-            p.connect(p.DIRECT)
+            p.connect(p.GUI)
         else:
             p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -22,10 +22,10 @@ class PyBulletSim:
         self.robot_body_id = p.loadURDF(
             "assets/ur5/doosan_origin.urdf", [0, 0, 0.83], p.getQuaternionFromEuler([0, 0, 0]))
 
-        self._base_id = p.loadURDF(
-            "assets/ur5/base_doosan.urdf", [0.75,0.3,0], p.getQuaternionFromEuler([0,0,np.pi]),useFixedBase=True)
-        self._cabin_id = p.loadURDF(
-            "assets/ur5/Cabin.urdf",[-0.75,-1,0], p.getQuaternionFromEuler([np.pi/2, 0, np.pi/2]),useFixedBase=True)
+        # self._base_id = p.loadURDF(
+        #     "assets/ur5/base_doosan.urdf", [0.75,0.3,0], p.getQuaternionFromEuler([0,0,np.pi]),useFixedBase=True)
+        # self._cabin_id = p.loadURDF(
+        #     "assets/ur5/Cabin.urdf",[-0.75,-1,0], p.getQuaternionFromEuler([np.pi/2, 0, np.pi/2]),useFixedBase=True)
         self._gripper_body_id = None
         self.robot_end_effector_link_index = 6
         self._robot_tool_offset = [0, 0, 0]
@@ -86,10 +86,10 @@ class PyBulletSim:
                        basePosition=[0.35, -0.45, 1.25],
                        useFixedBase=True
                        ),
-            p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.35, -0.45, 1.5],
-                       useFixedBase=True
-                       ),
+            # p.loadURDF('assets/obstacles/block.urdf',
+            #            basePosition=[0.35, -0.45, 1.5],
+            #            useFixedBase=True
+            #            ),
         ]
         self.obstacles.extend(
             [self._plane_id, self._tote_id,])
@@ -215,7 +215,7 @@ class PyBulletSim:
         # Adjust grasp_position to account for end-effector length
         grasp_position = grasp_position + self._tool_tip_to_ee_joint
         gripper_orientation = p.getQuaternionFromEuler(
-            [np.pi, 0, grasp_angle])
+            [np.pi, 0, grasp_angle+np.pi/2])
         pre_grasp_position_over_bin = grasp_position+np.array([0, 0, 0.3])
         pre_grasp_position_over_object = grasp_position+np.array([0, 0, 0.1])
         post_grasp_position = grasp_position+np.array([0, 0, 0.3])

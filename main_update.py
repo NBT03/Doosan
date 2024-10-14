@@ -9,10 +9,6 @@ import time
 
 MAX_ITERS = 10000
 delta_q = 0.1  # Step size
-k_att = 1.5   # Coefficient for attractive force
-k_rep = 1.2   # Coefficient for repulsive force
-d0 = 0.1      # Distance threshold for repulsive force
-
 
 class Node:
     def __init__(self, joint_positions, parent=None):
@@ -21,11 +17,12 @@ class Node:
 
 
 def visualize_path(q_1, q_2, env, color=[0, 1, 0]):
-    env.set_joint_positions(q_1)
-    point_1 = p.getLinkState(env.robot_body_id, 6)[0]
-    env.set_joint_positions(q_2)
-    point_2 = p.getLinkState(env.robot_body_id, 6)[0]
-    p.addUserDebugLine(point_1, point_2, color, 1.0)
+    # env.set_joint_positions(q_1)
+    # point_1 = p.getLinkState(env.robot_body_id, 6)[0]
+    # env.set_joint_positions(q_2)
+    # point_2 = p.getLinkState(env.robot_body_id, 6)[0]
+    # p.addUserDebugLine(point_1, point_2, color, 1.0)
+    pass
 
 
 def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, distance=0.1):
@@ -35,28 +32,12 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
     for i in range(MAX_ITERS):
         q_rand = semi_random_sample(steer_goal_p, q_goal)
         q_nearest = nearest([node.joint_positions for node in V], q_rand)
-
-        # Compute attractive and repulsive forces
-        attractive = attractive_force(q_nearest, q_goal, k_att)
-        obstacles = [node.joint_positions for node in V if node.joint_positions != q_nearest]
-        repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
-
-        # Apply forces to new point
-        # Thay đổi đoạn này trong dynamic_rrt_star
-        # Compute forces and limit total force
-        max_force = 1  # Giới hạn lực tổng (bạn có thể điều chỉnh giá trị này)
         q_new = steer(q_nearest, q_rand, delta_q)
-        # Apply forces to new point
-        total_force = apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force)
-
-        # Đảm bảo q_new vẫn trong giới hạn delta_q sau khi áp dụng lực
-        q_new = [q_new[i] + total_force[i] for i in range(len(q_new))]
-
         # Giới hạn bước di chuyển sau khi cộng thêm lực
         if get_euclidean_distance(q_new, q_nearest) > delta_q:
             q_new = steer(q_nearest, q_new, delta_q)
 
-        if not env.check_collision(q_new, distance=0.15):
+        if not env.check_collision(q_new, distance=0.1):
             q_new_node = Node(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node
@@ -116,52 +97,11 @@ def steer(q_nearest, q_rand, delta_q):
         q_hat = [(q_rand[i] - q_nearest[i]) / get_euclidean_distance(q_rand, q_nearest) for i in range(len(q_rand))]
         q_new = [q_nearest[i] + q_hat[i] * delta_q for i in range(len(q_hat))]
     return q_new
-
-
-def attractive_force(q_current, q_goal, k_att):
-    return [k_att * (q_goal[i] - q_current[i]) for i in range(len(q_current))]
-
-
-def repulsive_force(q_current, obstacles, k_rep, d0):
-    force = [0.0] * len(q_current)
-    for obs in obstacles:
-        dist = get_euclidean_distance(q_current, obs)
-        if dist < d0:
-            repulsive_magnitude = k_rep * (1 / dist - 1 / d0) / (dist ** 2)
-            for i in range(len(force)):
-                force[i] += repulsive_magnitude * (q_current[i] - obs[i]) / dist
-    return force
-
-
 def get_grasp_position_angle(object_id):
     position, grasp_angle = np.zeros((3, 1)), 0
     position, orientation = p.getBasePositionAndOrientation(object_id)
     grasp_angle = p.getEulerFromQuaternion(orientation)[2]
     return position, grasp_angle
-
-
-def apply_forces(q_nearest, q_goal, obstacles, k_att, k_rep, d0, max_force):
-    attractive = attractive_force(q_nearest, q_goal, k_att)
-    repulsive = repulsive_force(q_nearest, obstacles, k_rep, d0)
-
-    # Tính tổng lực
-    total_force = [attractive[i] + repulsive[i] for i in range(len(attractive))]
-
-    # Giới hạn lực tổng theo max_force
-    force_magnitude = np.linalg.norm(total_force)
-    if force_magnitude > max_force:
-        scaling_factor = max_force / force_magnitude
-        total_force = [f * scaling_factor for f in total_force]
-
-    # Tính toán tổng lực sau khi giới hạn và đảm bảo di chuyển trong khoảng delta_q
-    if force_magnitude > delta_q:
-        scaling_factor = delta_q / force_magnitude
-        total_force = [f * scaling_factor for f in total_force]
-
-    return total_force
-
-
-
 def run_dynamic_rrt_star():
     env.load_gripper()
     passed = 0
@@ -204,11 +144,36 @@ def run_dynamic_rrt_star():
             passed += 1
         env.reset_objects()
 
+def draw():
+    print("a")
+    object = env._objects_body_ids[0]
+    obstacles = env.obstacles[0]
+    getlink1 = p.getLinkState(object, 0)[0]
+    getlink2 = p.getLinkState(object, 1)[0]
+    midpoint = np.add(getlink1, getlink2) / 2
+    pointA = p.getClosestPoints(obstacles,object,100)
+    a = pointA[0][5]
+    line_id1 = p.addUserDebugLine(getlink1, a, lineColorRGB=[1, 0, 0], lineWidth=2)
+    line_id2 = p.addUserDebugLine(getlink2, a, lineColorRGB=[0, 1, 0], lineWidth=2)
+    line_id3 = p.addUserDebugLine(midpoint, a, lineColorRGB=[0, 1, 0], lineWidth=2)
+    while True:
+        print("a")
+        getlink1 = p.getLinkState(object, 0)[0]
+        getlink2 = p.getLinkState(object, 1)[0]
+        midpoint = np.add(getlink1, getlink2) / 2
+        pointA = p.getClosestPoints(obstacles, object, 100)
+        a = pointA[0][5]
+        p.addUserDebugLine(getlink1, a, lineColorRGB=[1, 0, 0], lineWidth=2,replaceItemUniqueId = line_id1)
+        p.addUserDebugLine(getlink2, a, lineColorRGB=[0, 1, 0], lineWidth=2, replaceItemUniqueId = line_id2)
+        p.addUserDebugLine(midpoint, a, lineColorRGB=[0, 1, 0], lineWidth=2,replaceItemUniqueId = line_id3)
 
 if __name__ == "__main__":
     random.seed(1)
     object_shapes = [
-        "assets/objects/cube.urdf",
+        "assets/objects/rod.urdf",
     ]
     env = sim_update.PyBulletSim(object_shapes=object_shapes)
-    run_dynamic_rrt_star()
+    thread1 = threading.Thread(target = run_dynamic_rrt_star)
+    thread2 = threading.Thread(target = draw)
+    thread1.start()
+    thread2.start()
