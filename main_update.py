@@ -37,7 +37,7 @@ def dynamic_rrt_star(env, q_init, q_goal, MAX_ITERS, delta_q, steer_goal_p, dist
         if get_euclidean_distance(q_new, q_nearest) > delta_q:
             q_new = steer(q_nearest, q_new, delta_q)
 
-        if not env.check_collision(q_new, distance=0.1):
+        if not env.check_collision(env._gripper_body_id, distance=0.1):
             q_new_node = Node(q_new)
             q_nearest_node = next(node for node in V if node.joint_positions == q_nearest)
             q_new_node.parent = q_nearest_node

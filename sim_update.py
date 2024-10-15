@@ -274,18 +274,19 @@ class PyBulletSim:
         assert len(self._robot_joint_indices) == len(values)
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
-    def check_collision(self, q, distance=0.05):
-        self.set_joint_positions(q)
 
-        # Lấy vị trí TCP (Tool Center Point)
-        tcp_position = p.getLinkState(self.robot_body_id, self.robot_end_effector_link_index)[0]
-
+    def check_collision(self, gripped_object_id, distance=0.1):
+        """
+        Hàm kiểm tra va chạm giữa vật mà robot đang gắp và các vật cản.
+        gripped_object_id: ID của vật mà robot đang gắp.
+        distance: Khoảng cách tối thiểu để phát hiện va chạm.
+        """
+        # Duyệt qua tất cả các vật cản
         for obstacle_id in self.obstacles:
-            # Kiểm tra khoảng cách từ TCP đến vật cản
-            closest_points = p.getClosestPoints(
-                self.robot_body_id, obstacle_id, distance, linkIndexA=self.robot_end_effector_link_index)
+            # Kiểm tra khoảng cách gần nhất giữa vật gắp được và vật cản
+            closest_points = p.getClosestPoints(gripped_object_id, obstacle_id, distance)
 
-            # Nếu có điểm nào trong phạm vi, báo va chạm
+            # Nếu có điểm nào trong khoảng cách quy định, báo va chạm
             if closest_points is not None and len(closest_points) != 0:
                 return True
 
