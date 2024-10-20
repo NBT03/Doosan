@@ -83,7 +83,7 @@ class PyBulletSim:
         self.reset_objects()
         self.obstacles = [
             p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.35, -0.45, 1.25],
+                       basePosition=[0.3, -0.25, 1.25],
                        useFixedBase=True
                        ),
             # p.loadURDF('assets/obstacles/block.urdf',
@@ -275,22 +275,13 @@ class PyBulletSim:
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
 
-    def check_collision(self, gripped_object_id, distance=0.1):
-        """
-        Hàm kiểm tra va chạm giữa vật mà robot đang gắp và các vật cản.
-        gripped_object_id: ID của vật mà robot đang gắp.
-        distance: Khoảng cách tối thiểu để phát hiện va chạm.
-        """
-        # Duyệt qua tất cả các vật cản
+    def check_collision(self, q, distance=0.18):
+        # self.set_joint_positions(q)
         for obstacle_id in self.obstacles:
-            # Kiểm tra khoảng cách gần nhất giữa vật gắp được và vật cản
-            closest_points = p.getClosestPoints(gripped_object_id, obstacle_id, distance)
-
-            # Nếu có điểm nào trong khoảng cách quy định, báo va chạm
+            closest_points = p.getClosestPoints(
+                self.robot_body_id, obstacle_id, distance)
             if closest_points is not None and len(closest_points) != 0:
                 return True
-
-        # Nếu không có va chạm nào, trả về False
         return False
 
 

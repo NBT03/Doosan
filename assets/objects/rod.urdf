@@ -31,13 +31,13 @@
   <link name="sphere_1">
     <visual>
       <geometry>
-        <sphere radius="0.01"/>
+        <sphere radius="0.001"/>
       </geometry>
       <material name="red"/>
     </visual>
     <collision>
       <geometry>
-        <sphere radius="0.01"/>
+        <sphere radius="0.001"/>
       </geometry>
     </collision>
     <inertial>
@@ -58,13 +58,13 @@
   <link name="sphere_2">
     <visual>
       <geometry>
-        <sphere radius="0.01"/>
+        <sphere radius="0.001"/>
       </geometry>
       <material name="green"/>
     </visual>
     <collision>
       <geometry>
-        <sphere radius="0.01"/>
+        <sphere radius="0.001"/>
       </geometry>
     </collision>
     <inertial>
