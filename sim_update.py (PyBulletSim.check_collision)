@@ -1,0 +1,13 @@
+import pybullet as p
+
+def check_collision(self, q, distance=0.18):
+    # self.set_joint_positions(q)
+    bodies_to_check = [self.robot_body_id]
+    if self._gripper_body_id is not None:
+        bodies_to_check.append(self._gripper_body_id)
+    for obstacle_id in self.obstacles:
+        for body_id in bodies_to_check:
+            closest_points = p.getClosestPoints(body_id, obstacle_id, distance)
+            if closest_points:
+                return True
+    return False

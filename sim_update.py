@@ -42,14 +42,13 @@ class PyBulletSim:
         self._joint_epsilon = 1e-3
 
         # Robot home joint configuration (over tote 1)
-        self.robot_home_joint_config = [np.pi*-0.5225555555555556,
-                                        np.pi*-0.07583333333333334,
-                                        np.pi*0.5659444444444445,
-                                        np.pi*0.008222222222222223,
-                                        np.pi * 0.49961111111111123,
-                                        np.pi * 0.020722222222222222]
-        self.robot_after_grip = [np.pi,
-                                        0, np.pi / 2, 0, np.pi / 2, 0]
+        self.robot_home_joint_config = [np.pi*(-94.06/180),
+                                        np.pi*(-13.65/180),
+                                        np.pi*(101.87/180),
+                                        np.pi*(1.48/180),
+                                        np.pi * (89.39/180),
+                                        np.pi * (3.73/180)]
+
 
         # Robot goal joint configuration (over tote 2)
         self.robot_goal_joint_config = [ np.pi * (-10.00 / 180),
@@ -82,17 +81,15 @@ class PyBulletSim:
             p.changeVisualShape(object_body_id, -1, rgbaColor=[*self._object_colors[i], 1])
         self.reset_objects()
         self.obstacles = [
-            p.loadURDF('assets/obstacles/block.urdf',
-                       basePosition=[0.3, -0.25, 1.25],
-                       useFixedBase=True
-                       ),
             # p.loadURDF('assets/obstacles/block.urdf',
-            #            basePosition=[0.35, -0.45, 1.5],
+            #            basePosition=[0.5, -0.25, 1.25],
             #            useFixedBase=True
             #            ),
+            p.loadURDF('assets/obstacles/block.urdf',
+                       basePosition=[0.4, -0.6, 1.25],
+                       useFixedBase=True
+                       ),
         ]
-        self.obstacles.extend(
-            [self._plane_id, self._tote_id,])
 
     def get_distance_to_obstacle(self, q_nearest, obstacle):
         # Đặt cấu hình của robot tại q_nearest
@@ -275,14 +272,45 @@ class PyBulletSim:
         for joint, value in zip(self._robot_joint_indices, values):
             p.resetJointState(self.robot_body_id, joint, value)
 
-    def check_collision(self, q, distance=0.18):
-        # self.set_joint_positions(q)
+    def check_collision(self, q, distance=0.15):
+        """
+        Check collision between all parts of the robot (excluding the base) and obstacles.
+
+        :param q: A list of joint angles representing the robot's configuration.
+        :param distance: The minimum allowed distance between the robot and any obstacle.
+        :return: True if a collision is detected, False otherwise.
+        """
+        # Set the robot to the specified joint configuration
+        self.set_joint_positions(q)
+
+        # Ensure the gripper is loaded before performing collision checks
+        if self._gripper_body_id is None:
+            print("Gripper not loaded. Please load the gripper before checking collisions.")
+            return False
+
+        collision_detected = False
+
+        # Get all link indices of the robot (excluding the base)
+        num_links = p.getNumJoints(self.robot_body_id)
+        robot_link_indices = list(range(num_links))  # Exclude the base by not including -1
+
+        # Iterate through each link of the robot and each obstacle to check for collisions
         for obstacle_id in self.obstacles:
-            closest_points = p.getClosestPoints(
-                self.robot_body_id, obstacle_id, distance)
-            if closest_points is not None and len(closest_points) != 0:
-                return True
-        return False
+            for link_idx in robot_link_indices:
+                # Get link name for better logging
+                link_name = p.getJointInfo(self.robot_body_id, link_idx)[12].decode('utf-8')
+
+                closest_points = p.getClosestPoints(
+                    self.robot_body_id, obstacle_id, distance, linkIndexA=link_idx)
+                if closest_points:
+                    # Collision detected
+                    print(f"Collision detected between robot link '{link_name}' (index {link_idx}) and obstacle ID {obstacle_id}")
+                    collision_detected = True
+                    break  # Exit early on first detected collision
+            if collision_detected:
+                break  # Exit if any collision is detected
+
+        return collision_detected
 
 
 class SphereMarker:
@@ -361,3 +389,8 @@ def get_tableau_palette():
         dtype=np.cfloat
     )
     return palette / 255.
+
+
+
+
+
